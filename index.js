@@ -1,10 +1,11 @@
 var params = {
 	gravityPositionX: 0.0,
 	gravityPositionY: 0.0,
-	pointSize: 1.0,
+	pointSize: 25.0,
 	cameraPositionZ: 10.0,
-	pointBrightness: 1.0,
-	simulationSpeed: 1.0
+	pointBrightness: 0.3,
+	simulationSpeed: 1.0,
+	followMouse: false
 };
 
 var camera, count = 0, scene, renderer, clock = new THREE.Clock(), container;
@@ -44,6 +45,7 @@ function initGUI() {
 	gui.add(params, 'pointBrightness').min(0.0).max(2.0).step(0.01);
 	gui.add(params, 'cameraPositionZ').min(0.0).max(100.0).step(0.1);
 	gui.add(params, 'simulationSpeed').min(0.0).max(2.0).step(0.1);
+	gui.add(params, 'followMouse');
 }
 
 function init() {
@@ -61,7 +63,7 @@ function init() {
   const ASPECT = WIDTH / HEIGHT;
   const NEAR = 0.1;
   const FAR = 10000;
-	const SIZE = 1024;
+	const SIZE = 512;
 
 	clock.start();
 
@@ -128,16 +130,19 @@ function init() {
 
 var pos = new THREE.Vector3(0.0,0.0,0.0);
 function onMouseMove(event) {
-	mouse = new THREE.Vector2()
-	event.preventDefault();
-	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-	mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-	var vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
-	vector.unproject( camera );
-	var dir = vector.sub( camera.position ).normalize();
-	var distance = - camera.position.z / dir.z;
-	pos = camera.position.clone().add( dir.multiplyScalar( distance ) );
-
+	if (params['followMouse']) {
+		mouse = new THREE.Vector2()
+		event.preventDefault();
+		mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+		mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+		var vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
+		vector.unproject( camera );
+		var dir = vector.sub( camera.position ).normalize();
+		var distance = - camera.position.z / dir.z;
+		pos = camera.position.clone().add( dir.multiplyScalar( distance ) );
+	} else {
+		pos = new THREE.Vector3(0,0,0);
+	}
 
 };
 
@@ -154,6 +159,8 @@ function animate() {
 
 	positionVisualisation.setInput('in_pointSize', params['pointSize']);
 	positionVisualisation.setInput('in_pointBrightness', params['pointBrightness']);
+
+	pos = new THREE.Vector3(1.0*snoise2d(clock.getElapsedTime()/5.0, 0.0),1.0*snoise2d(0.0, clock.getElapsedTime()/5.0),0);
 
 	velocityComputeModule.setInput('gravityPosition', pos);
 	velocityComputeModule.setInput('timeScale', params['simulationSpeed']);
