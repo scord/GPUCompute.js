@@ -9,7 +9,7 @@ uniform float in_pointBrightness;
 void main()	{
 
 
-	vec2 uv = position.xy + vec2( 0.5 / size, 0.5 / size );
+	vec2 uv = position.xy ;
 	vec4 data = texture2D( positionTexture, uv );
 
 	vPos = data.xyz;

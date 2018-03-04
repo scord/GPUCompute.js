@@ -4,19 +4,11 @@ var GPUCompute = function( renderer, size ) {
 	computeScene = new THREE.Scene();
 	computeMesh = new THREE.Mesh( new THREE.PlaneBufferGeometry( 1, 1 ) );
 	computeScene.add( computeMesh );
+
   this.size = size;
   defaultVertexShader = "varying vec2 vUv; varying vec3 vPos; void main()	{ vUv = vec2( uv.x, uv.y); vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );}";
-  //defaultShader = new THREE.ShaderMaterial({vertexShader: "void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );}", fragmentShader: "void main()	{ gl_FragColor = vec4(1,1,1,1); }", uniforms: {}});
 
-  function createMaterial(computeShader) {
-    return new THREE.ShaderMaterial({
-  		uniforms: {},
-  		vertexShader: defaultVertexShader,
-  		fragmentShader: computeShader
-  	});
-  }
-
-  var modules = {};
+  var modules = [];
   var outputTexture;
 
   this.createTexture = function() {
@@ -26,30 +18,59 @@ var GPUCompute = function( renderer, size ) {
     return texture;
   }
 
-  this.createModule = function(name, computeShader, initialData, output) {
-
-
-    var module = new Module(name, computeShader, initialData);
-    modules[name] = module;
-
-    if (output) {
-      outputTexture = module.outputRenderTarget.texture;
-    }
-    return module;
-  }
-
   this.compute = function() {
-
-    for (var i in modules) {
+    for (var i = 0; i < modules.length; i++) {
       modules[i].compute();
     }
-
-    return outputTexture;
   }
 
-  Module = function( name, computeShader,initialData ) {
+  this.addToComputeQueue = function(module) {
+    modules.push(module);
+  }
+
+  this.Visualisation = function(module, vertexShader, fragmentShader) {
+
+    var geometry = new THREE.BufferGeometry();
+  	positions = new Float32Array(size*size * 3)	;
+
+  	for (x = 0; x < size; x++) {
+  		for (y = 0; y < size; y++) {
+  			offset = 3*(x+size*y);
+  			positions[offset] = x/(size);
+  			positions[offset+1] = y/(size);
+  			positions[offset+2] = 0;
+  		}
+  	}
+
+  	geometry.addAttribute('position', new THREE.BufferAttribute( positions, 3));
+
+  	var material = new THREE.ShaderMaterial( {
+  		uniforms: {
+  			positionTexture: { type: "t", value: module.outputRenderTarget.texture }
+  		},
+  		vertexShader: vertexShader,
+  		fragmentShader: fragmentShader,
+  		blending: THREE.AdditiveBlending,
+  		transparent: true,
+  		depthTest: false
+  	});
+
+    this.particles = new THREE.Points( geometry, material );
+
+    this.setInput = function(name, value) {
+      material.uniforms[name] = { value: value };
+    }
+  }
+
+  this.Module = function( name, computeShader,initialData ) {
     this.name = "in_"+name;
-    this.material = createMaterial(computeShader);
+    this.material = new THREE.ShaderMaterial({
+                      uniforms: {},
+                      vertexShader: defaultVertexShader,
+                      fragmentShader: computeShader
+                    });
+
+
 
     this.outputRenderTarget = new THREE.WebGLRenderTarget( size, size, {
   		minFilter: THREE.NearestFilter,
