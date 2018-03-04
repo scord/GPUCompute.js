@@ -1,9 +1,9 @@
 var params = {
 	gravityPositionX: 0.0,
 	gravityPositionY: 0.0,
-	pointSize: 25.0,
+	pointSize: 1.0,
 	cameraPositionZ: 10.0,
-	pointBrightness: 0.3,
+	pointBrightness: 1.0,
 	simulationSpeed: 1.0,
 	followMouse: false
 };
@@ -63,7 +63,7 @@ function init() {
   const ASPECT = WIDTH / HEIGHT;
   const NEAR = 0.1;
   const FAR = 10000;
-	const SIZE = 512;
+	const SIZE = 1024;
 
 	clock.start();
 
