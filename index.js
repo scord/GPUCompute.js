@@ -160,8 +160,9 @@ function animate() {
 	positionVisualisation.setInput('in_pointSize', params['pointSize']);
 	positionVisualisation.setInput('in_pointBrightness', params['pointBrightness']);
 
-	pos = new THREE.Vector3(1.0*snoise2d(clock.getElapsedTime()/5.0, 0.0),1.0*snoise2d(0.0, clock.getElapsedTime()/5.0),0);
-
+	if (!params['followMouse']) {
+		pos = new THREE.Vector3(1.0*snoise2d(clock.getElapsedTime()/5.0, 0.0),1.0*snoise2d(0.0, clock.getElapsedTime()/5.0),0);
+	}
 	velocityComputeModule.setInput('gravityPosition', pos);
 	velocityComputeModule.setInput('timeScale', params['simulationSpeed']);
 	positionComputeModule.setInput('timeScale', params['simulationSpeed']);
