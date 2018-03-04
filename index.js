@@ -1,3 +1,12 @@
+var params = {
+	gravityPositionX: 0.0,
+	gravityPositionY: 0.0,
+	pointSize: 1.0,
+	cameraPositionZ: 10.0,
+	pointBrightness: 1.0,
+	simulationSpeed: 1.0
+};
+
 var camera, count = 0, scene, renderer, clock = new THREE.Clock(), container;
 
 var shaders = {};
@@ -23,13 +32,7 @@ $.when.apply($, loadFiles(shaders, shaderFilenames)).then(function() {
 	animate();
 });
 
-var params = {
-	gravityPositionX: 0.0,
-	gravityPositionY: 0.0,
-	pointSize: 1.0,
-	cameraPositionZ: 10.0,
-	pointBrightness: 1.0
-};
+
 
 function initGUI() {
 	var gui = new dat.gui.GUI({
@@ -37,16 +40,15 @@ function initGUI() {
 	})
 
 	gui.remember(params);
-	gui.add(params, 'gravityPositionX').min(-1.0).max(1.0).step(0.1);
-	gui.add(params, 'gravityPositionY').min(-1.0).max(1.0).step(0.1);
 	gui.add(params, 'pointSize').min(0.0).max(100.0).step(0.01);
 	gui.add(params, 'pointBrightness').min(0.0).max(2.0).step(0.01);
 	gui.add(params, 'cameraPositionZ').min(0.0).max(100.0).step(0.1);
+	gui.add(params, 'simulationSpeed').min(0.0).max(2.0).step(0.1);
 }
 
 function init() {
   // Get the DOM element to attach to
-  const container = document.querySelector('#container');
+  container = document.querySelector('#container');
 
 	initGUI();
 
@@ -59,7 +61,7 @@ function init() {
   const ASPECT = WIDTH / HEIGHT;
   const NEAR = 0.1;
   const FAR = 10000;
-	const SIZE = 2048;
+	const SIZE = 1024;
 
 	clock.start();
 
@@ -117,12 +119,33 @@ function init() {
 
   // Start the renderer.
   renderer.setSize(WIDTH, HEIGHT);
-
+	document.addEventListener('mousemove', onMouseMove, false);
+	window.addEventListener('resize', onWindowResize, false);
   // Attach the renderer-supplied
   // DOM element.
   container.appendChild(renderer.domElement);
 }
 
+var pos = new THREE.Vector3(0.0,0.0,0.0);
+function onMouseMove(event) {
+	mouse = new THREE.Vector2()
+	event.preventDefault();
+	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+	mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+	var vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
+	vector.unproject( camera );
+	var dir = vector.sub( camera.position ).normalize();
+	var distance = - camera.position.z / dir.z;
+	pos = camera.position.clone().add( dir.multiplyScalar( distance ) );
+
+
+};
+
+function onWindowResize( event ) {
+	camera.aspect = container.offsetWidth / container.offsetHeight;
+	camera.updateProjectionMatrix();
+	renderer.setSize( container.offsetWidth, container.offsetHeight );
+}
 
 function animate() {
 
@@ -132,10 +155,11 @@ function animate() {
 	positionVisualisation.setInput('in_pointSize', params['pointSize']);
 	positionVisualisation.setInput('in_pointBrightness', params['pointBrightness']);
 
-	velocityComputeModule.setInput('gravityPosition', new THREE.Vector3(params['gravityPositionX'], params['gravityPositionY'], 0.0));
-
-	positionVisualisation.particles.rotation.x += 0.002;
-	positionVisualisation.particles.rotation.y += 0.002;
+	velocityComputeModule.setInput('gravityPosition', pos);
+	velocityComputeModule.setInput('timeScale', params['simulationSpeed']);
+	positionComputeModule.setInput('timeScale', params['simulationSpeed']);
+	//positionVisualisation.particles.rotation.x += 0.002;
+	//positionVisualisation.particles.rotation.y += 0.002;
 
 	gpuCompute.compute();
 
