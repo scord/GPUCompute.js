@@ -16,15 +16,15 @@ void main()	{
 	vec4 data2 = texture2D( in_velocity, vUv );
 	vec3 vel = data2.xyz;
 
-	float dist = clamp(distance(gravityPosition, pos), 3.0, 10.0);
+	float dist = clamp(distance(gravityPosition, pos), 3.0, 100.0);
 
 
 	vec3 toOrigin = normalize(gravityPosition - pos)/(dist);
 
 	vel += toOrigin*0.003*timeScale;
 
-	if (length(vel) > 0.06) {
-		vel = normalize(vel)*0.06;
+	if (length(vel) > 0.2) {
+		vel = normalize(vel)*0.2;
 	}
 
 	gl_FragColor = vec4(vel, 1);

@@ -24,6 +24,12 @@ var GPUCompute = function( renderer, size ) {
     }
   }
 
+  this.dispose = function() {
+    for (var i = 0; i < modules.length; i++) {
+      modules[i].dispose();
+    }
+  }
+
   this.addToComputeQueue = function(module) {
     modules.push(module);
   }
@@ -31,7 +37,7 @@ var GPUCompute = function( renderer, size ) {
   this.Visualisation = function(module, vertexShader, fragmentShader) {
 
     var geometry = new THREE.BufferGeometry();
-  	positions = new Float32Array(size*size * 3)	;
+  	var positions = new Float32Array(size*size * 3)	;
 
   	for (x = 0; x < size; x++) {
   		for (y = 0; y < size; y++) {
@@ -54,6 +60,13 @@ var GPUCompute = function( renderer, size ) {
   		transparent: true,
   		depthTest: false
   	});
+
+    this.dispose = function() {
+      positions = undefined;
+      material.dispose();
+      geometry.dispose();
+      this.particles = undefined;
+    }
 
     this.particles = new THREE.Points( geometry, material );
 
@@ -96,6 +109,12 @@ var GPUCompute = function( renderer, size ) {
 
     this.setInput = function(name, value) {
       this.material.uniforms[name] = { value: value };
+    }
+
+    this.dispose = function() {
+      swapRenderTarget.dispose();
+      this.outputRenderTarget.dispose();
+      this.material.dispose();
     }
 
     this.compute = function() {

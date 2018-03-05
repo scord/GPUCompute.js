@@ -6,6 +6,8 @@ uniform float in_pointSize;
 varying vec3 vPos;
 varying float pointSize;
 uniform float in_pointBrightness;
+
+varying float attenuation;
 void main()	{
 
 
@@ -15,8 +17,8 @@ void main()	{
 	vPos = data.xyz;
 
 	vec4 p = projectionMatrix * modelViewMatrix * vec4( vPos, 1.0 );
-	float attenuation = p.w;
-	pointSize = in_pointSize/attenuation;
-	gl_PointSize = pointSize;
+	attenuation = p.w;
+	pointSize = in_pointSize;
+	gl_PointSize = pointSize/attenuation;
 	gl_Position = projectionMatrix * modelViewMatrix * vec4( vPos, 1.0 );
 }

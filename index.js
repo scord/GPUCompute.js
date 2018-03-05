@@ -1,11 +1,14 @@
 var params = {
 	gravityPositionX: 0.0,
 	gravityPositionY: 0.0,
-	pointSize: 1.0,
+	pointSize: 20.0,
 	cameraPositionZ: 10.0,
 	pointBrightness: 1.0,
+	pointIntensity: 1.0,
 	simulationSpeed: 1.0,
-	followMouse: false
+	followMouse: false,
+	size: 1024,
+	pointColour: { h: 350, s: 0.9, v: 0.3 }
 };
 
 var camera, count = 0, scene, renderer, clock = new THREE.Clock(), container;
@@ -33,8 +36,6 @@ $.when.apply($, loadFiles(shaders, shaderFilenames)).then(function() {
 	animate();
 });
 
-
-
 function initGUI() {
 	var gui = new dat.gui.GUI({
 		height: 5*32-1
@@ -43,9 +44,20 @@ function initGUI() {
 	gui.remember(params);
 	gui.add(params, 'pointSize').min(0.0).max(100.0).step(0.01);
 	gui.add(params, 'pointBrightness').min(0.0).max(2.0).step(0.01);
-	gui.add(params, 'cameraPositionZ').min(0.0).max(100.0).step(0.1);
+	gui.add(params, 'cameraPositionZ').min(0.0).max(20.0).step(0.1);
 	gui.add(params, 'simulationSpeed').min(0.0).max(2.0).step(0.1);
 	gui.add(params, 'followMouse');
+	/*var sizeController = gui.add(params, 'size', 1, 4096);
+	sizeController.onFinishChange(function(value) {
+		scene.remove(positionVisualisation.particles);
+		positionVisualisation.dispose();
+		gpuCompute.dispose();
+
+		gpuCompute = undefined;
+
+		initGPUCompute(value);
+	});*/
+	gui.addColor(params, 'pointColour');
 }
 
 function init() {
@@ -59,7 +71,7 @@ function init() {
   const HEIGHT = container.clientHeight;
 
   // Set some camera attributes.
-  const VIEW_ANGLE = 45;
+  const VIEW_ANGLE = 50;
   const ASPECT = WIDTH / HEIGHT;
   const NEAR = 0.1;
   const FAR = 10000;
@@ -73,7 +85,22 @@ function init() {
   camera = new THREE.PerspectiveCamera(VIEW_ANGLE,ASPECT,NEAR,FAR);
 
   scene = new THREE.Scene();
-	gpuCompute = new GPUCompute( renderer, SIZE );
+
+	initGPUCompute(SIZE);
+
+  scene.add(camera);
+
+  // Start the renderer.
+  renderer.setSize(WIDTH, HEIGHT);
+	document.addEventListener('mousemove', onMouseMove, false);
+	window.addEventListener('resize', onWindowResize, false);
+  // Attach the renderer-supplied
+  // DOM element.
+  container.appendChild(renderer.domElement);
+}
+
+function initGPUCompute(size) {
+	gpuCompute = new GPUCompute( renderer, size );
 
 	var initialPositionTexture = gpuCompute.createTexture();
 	var pixels = initialPositionTexture.image.data;
@@ -90,7 +117,7 @@ function init() {
 
 	var initialVelocityTexture = gpuCompute.createTexture();
 	var pixels = initialVelocityTexture.image.data;
-	var scale = 0.0001;
+	var scale = 0.00001;
 
 	for (x = 0; x < gpuCompute.size; x++) {
 		for (y = 0; y < gpuCompute.size; y++) {
@@ -113,20 +140,13 @@ function init() {
 	velocityComputeModule.setInputModule(velocityComputeModule);
 	velocityComputeModule.setInputModule(positionComputeModule);
 
-
 	positionVisualisation = new gpuCompute.Visualisation(positionComputeModule, shaders['points.vert'], shaders['points.frag']);
-
 	scene.add(positionVisualisation.particles);
-  scene.add(camera);
 
-  // Start the renderer.
-  renderer.setSize(WIDTH, HEIGHT);
-	document.addEventListener('mousemove', onMouseMove, false);
-	window.addEventListener('resize', onWindowResize, false);
-  // Attach the renderer-supplied
-  // DOM element.
-  container.appendChild(renderer.domElement);
 }
+
+
+
 
 var pos = new THREE.Vector3(0.0,0.0,0.0);
 function onMouseMove(event) {
@@ -159,6 +179,11 @@ function animate() {
 
 	positionVisualisation.setInput('in_pointSize', params['pointSize']);
 	positionVisualisation.setInput('in_pointBrightness', params['pointBrightness']);
+	positionVisualisation.setInput('in_pointIntensity', params['pointIntensity']);
+
+	positionVisualisation.setInput('in_hue', params['pointColour'].h)
+	positionVisualisation.setInput('in_saturation', params['pointColour'].s)
+	positionVisualisation.setInput('in_lightness', params['pointColour'].v)
 
 	if (!params['followMouse']) {
 		pos = new THREE.Vector3(1.0*snoise2d(clock.getElapsedTime()/5.0, 0.0),1.0*snoise2d(0.0, clock.getElapsedTime()/5.0),0);
