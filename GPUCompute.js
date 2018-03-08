@@ -11,20 +11,17 @@ var GPUCompute = function( renderer, size ) {
   var modules = [];
   var outputTexture;
 
-  this.createTexture = function() {
-    var a = new Float32Array( size * size * 4 );
-		var texture = new THREE.DataTexture( a, size, size, THREE.RGBAFormat, THREE.FloatType );
-		texture.needsUpdate = true;
-    return texture;
-  }
-
   this.compute = function() {
+    for (var i = 0; i < modules.length; i++) {
+      modules[i].computed = false;
+    }
     for (var i = 0; i < modules.length; i++) {
       modules[i].compute();
     }
   }
 
   this.dispose = function() {
+
     for (var i = 0; i < modules.length; i++) {
       modules[i].dispose();
     }
@@ -39,6 +36,7 @@ var GPUCompute = function( renderer, size ) {
     var geometry = new THREE.BufferGeometry();
   	var positions = new Float32Array(size*size * 3)	;
 
+    // align particles in grid so that each can be accessed by UV coordinates
   	for (x = 0; x < size; x++) {
   		for (y = 0; y < size; y++) {
   			offset = 3*(x+size*y);
@@ -61,11 +59,8 @@ var GPUCompute = function( renderer, size ) {
   		depthTest: false
   	});
 
-    this.dispose = function() {
-      positions = undefined;
-      material.dispose();
-      geometry.dispose();
-      this.particles = undefined;
+    this.update = function() {
+      material.uniforms.positionTexture.value = module.outputRenderTarget.texture;
     }
 
     this.particles = new THREE.Points( geometry, material );
@@ -75,15 +70,26 @@ var GPUCompute = function( renderer, size ) {
     }
   }
 
-  this.Module = function( name, computeShader,initialData ) {
+  this.Module = function( name, computeShader, initialiseFunction ) {
     this.name = "in_"+name;
     this.material = new THREE.ShaderMaterial({
-                      uniforms: {},
+                      uniforms: { size: {value: 0.0}},
                       vertexShader: defaultVertexShader,
                       fragmentShader: computeShader
                     });
 
+    this.initialiseTextures = function(initialiseFunction) {
+      var a = new Float32Array( size * size * 4 );
 
+      initialiseFunction(a, size);
+
+  		this.inputRenderTarget.texture = new THREE.DataTexture( a, size, size, THREE.RGBAFormat, THREE.FloatType);
+  		this.inputRenderTarget.texture.needsUpdate = true;
+
+      this.outputRenderTarget.texture = new THREE.DataTexture( a, size, size, THREE.RGBAFormat, THREE.FloatType);
+  		this.outputRenderTarget.texture.needsUpdate = true;
+
+    }
 
     this.outputRenderTarget = new THREE.WebGLRenderTarget( size, size, {
   		minFilter: THREE.NearestFilter,
@@ -93,16 +99,21 @@ var GPUCompute = function( renderer, size ) {
   		depthBuffer: false,
   		stencilBuffer: false
   	});
-    var swapRenderTarget = this.outputRenderTarget.clone();
+    this.inputRenderTarget = this.outputRenderTarget.clone();
+    this.historyRenderTarget = this.outputRenderTarget.clone();
 
-    if (initialData !== null) {
-      this.outputRenderTarget.texture = initialData;
+    if (initialiseFunction != null) {
+      this.initialiseTextures(initialiseFunction);
     }
 
     this.inputModules = {};
 
     this.setInputModule = function(inputModule) {
       this.material.uniforms[inputModule.name] = {type:"t", value: null};
+
+      if (inputModule.name == this.name) {
+        this.material.uniforms[this.name + "_old"] = {type:"t", value: null};
+      }
       //inputModule.outputRenderTarget.texture = value;
       this.inputModules[inputModule.name] = inputModule;
     }
@@ -111,22 +122,37 @@ var GPUCompute = function( renderer, size ) {
       this.material.uniforms[name] = { value: value };
     }
 
-    this.dispose = function() {
-      swapRenderTarget.dispose();
-      this.outputRenderTarget.dispose();
-      this.material.dispose();
-    }
+    this.computed = false;
 
     this.compute = function() {
 
+      // swap render targets
+      var tmp = this.inputRenderTarget;
+      var tmp2 = this.historyRenderTarget;
+      this.inputRenderTarget = this.outputRenderTarget;
+      this.historyRenderTarget = tmp;
+      this.outputRenderTarget = tmp2;
+
+      // assign input module outputs to textures
       for (var i in this.inputModules) {
-        this.material.uniforms[this.inputModules[i].name].value = this.inputModules[i].outputRenderTarget.texture; // result from last iteration;
+        if (this.inputModules[i].name == this.name) {
+          this.material.uniforms[this.name].value = this.inputRenderTarget.texture;
+          this.material.uniforms[this.name + "_old"].value = this.historyRenderTarget.texture;
+        } else {
+          if (this.inputModules[i].computed) {
+            // if module has been computed this iteration, get output from the previous iteration
+            this.material.uniforms[this.inputModules[i].name].value = this.inputModules[i].inputRenderTarget.texture;
+          } else {
+            // get output from the previous iteration
+            this.material.uniforms[this.inputModules[i].name].value = this.inputModules[i].outputRenderTarget.texture; // result from last iteration;
+          }
+        }
       }
 
-      this.outputRenderTarget = [swapRenderTarget, swapRenderTarget = this.outputRenderTarget][0]; // swap render targets
       computeMesh.material = this.material;
   		renderer.render(computeScene, computeCamera, this.outputRenderTarget, true);
-    //  computeMesh.material = defaultShader;
+
+      this.computed = true;
     }
   }
 
