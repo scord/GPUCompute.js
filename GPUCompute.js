@@ -71,7 +71,7 @@ var GPUCompute = function( renderer, size ) {
   }
 
   this.Module = function( name, computeShader, initialiseFunction ) {
-    this.name = "in_"+name;
+    this.name = name;
     this.material = new THREE.ShaderMaterial({
                       uniforms: { size: {value: 0.0}},
                       vertexShader: defaultVertexShader,
@@ -107,15 +107,21 @@ var GPUCompute = function( renderer, size ) {
     }
 
     this.inputModules = {};
+    this.historyModules = {};
 
-    this.setInputModule = function(inputModule) {
-      this.material.uniforms[inputModule.name] = {type:"t", value: null};
+    this.setInputModule = function(inputName, inputModule, memory) {
 
-      if (inputModule.name == this.name) {
-        this.material.uniforms[this.name + "_old"] = {type:"t", value: null};
+      this.material.uniforms[inputName] = {type:"t", value: null};
+
+      if (memory) {
+        this.material.uniforms[inputName + "_old"] = {type:"t", value: null};
+        this.historyModules[inputName] = inputModule;
+      } else {
+        this.inputModules[inputName] = inputModule;
       }
+
       //inputModule.outputRenderTarget.texture = value;
-      this.inputModules[inputModule.name] = inputModule;
+
     }
 
     this.setInput = function(name, value) {
@@ -135,17 +141,21 @@ var GPUCompute = function( renderer, size ) {
 
       // assign input module outputs to textures
       for (var i in this.inputModules) {
-        if (this.inputModules[i].name == this.name) {
-          this.material.uniforms[this.name].value = this.inputRenderTarget.texture;
-          this.material.uniforms[this.name + "_old"].value = this.historyRenderTarget.texture;
+        if (this.inputModules[i].name == this.name || this.inputModules[i].computed) {
+          this.material.uniforms[i].value = this.inputModules[i].inputRenderTarget.texture;
         } else {
-          if (this.inputModules[i].computed) {
-            // if module has been computed this iteration, get output from the previous iteration
-            this.material.uniforms[this.inputModules[i].name].value = this.inputModules[i].inputRenderTarget.texture;
-          } else {
-            // get output from the previous iteration
-            this.material.uniforms[this.inputModules[i].name].value = this.inputModules[i].outputRenderTarget.texture; // result from last iteration;
-          }
+          this.material.uniforms[i].value = this.inputModules[i].outputRenderTarget.texture;
+        }
+      }
+
+      // same as above loop but also sets _old inputs from previous iteration
+      for (var i in this.historyModules) {
+        if (this.historyModules[i].name == this.name || this.historyModules[i].computed) {
+          this.material.uniforms[i].value = this.historyModules[i].inputRenderTarget.texture;
+          this.material.uniforms[i + "_old"].value = this.historyModules[i].historyRenderTarget.texture;
+        } else {
+          this.material.uniforms[i].value = this.historyModules[i].outputRenderTarget.texture;
+          this.material.uniforms[i + "_old"].value = this.inputRenderTarget.texture;
         }
       }
 
